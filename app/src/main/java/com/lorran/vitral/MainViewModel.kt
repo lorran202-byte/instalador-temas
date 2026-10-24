@@ -107,23 +107,27 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val q = Shell::q
         val keep = "${Slots.ORIGINALS}/${slot.id}"
         val done = mutableListOf<String>()
-        val firstTime = slot.id !in s.saved
         for ((code, file) in parts) {
             val subId = slot.parts[code] ?: continue
             val content = "${Slots.DATA}/content/$code/$subId.mrc"
             val meta = "${Slots.DATA}/meta/$code/$subId.mrm"
             step("Trocando: ${label(code)}…")
-            if (firstTime) {
-                val r = Shell.run("mkdir -p ${q("$keep/content/$code")} ${q("$keep/meta/$code")} && " +
-                    "cp ${q(content)} ${q("$keep/content/$code/")} && cp ${q(meta)} ${q("$keep/meta/$code/")}")
-                if (!r.ok) return@launch fail("Não consegui guardar a cópia original de ${label(code)}.", r)
+            // guarda o original de cada parte só na primeira vez (nunca sobrescreve a cópia)
+            val keepC = "$keep/content/$code/$subId.mrc"
+            val keepM = "$keep/meta/$code/$subId.mrm"
+            val r = Shell.run("mkdir -p ${q("$keep/content/$code")} ${q("$keep/meta/$code")} && " +
+                "{ [ -f ${q(keepC)} ] || cp ${q(content)} ${q(keepC)}; } && { [ -f ${q(keepM)} ] || cp ${q(meta)} ${q(keepM)}; }")
+            if (!r.ok) return@launch fail("Não consegui guardar a cópia original de ${label(code)}.", r)
+            val w = Shell.writeFile(content) { file.inputStream() }
+            if (!w.ok) {
+                // devolve o original desta parte antes de avisar
+                Shell.run("[ -f ${q(content)} ] || cp ${q("$keep/content/$code/$subId.mrc")} ${q(content)}")
+                return@launch fail("Não consegui gravar ${label(code)}.", w)
             }
-            val w = Shell.run("cat > ${q(content)}", file.inputStream())
-            if (!w.ok) return@launch fail("Não consegui gravar ${label(code)}.", w)
             val old = Shell.run("cat ${q(meta)}")
             if (old.ok && old.out.isNotBlank()) {
                 val patched = Slots.patchMeta(old.out, sha1(file), file.length())
-                Shell.run("cat > ${q(meta)}", patched.byteInputStream())
+                Shell.writeFile(meta) { patched.byteInputStream() }
             }
             done += label(code)
         }

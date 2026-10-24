@@ -48,18 +48,38 @@ object Shell {
     suspend fun run(cmd: String, input: InputStream? = null): ShellResult = withContext(Dispatchers.IO) {
         try {
             val p = start(cmd)
-            if (input != null) {
-                p.outputStream.use { out -> input.use { it.copyTo(out, 256 * 1024) } }
-            } else {
-                p.outputStream.close()
+            var writeError: String? = null
+            try {
+                if (input != null) {
+                    p.outputStream.use { out -> input.use { it.copyTo(out, 256 * 1024) } }
+                } else {
+                    p.outputStream.close()
+                }
+            } catch (e: java.io.IOException) {
+                // O comando terminou antes de ler tudo: o motivo real está no stderr.
+                writeError = e.message
+                runCatching { p.outputStream.close() }
             }
             val out = p.inputStream.bufferedReader().readText()
             val err = p.errorStream.bufferedReader().readText()
-            ShellResult(p.waitFor(), out.trim(), err.trim())
+            val code = p.waitFor()
+            val finalCode = if (writeError != null && code == 0) 1 else code
+            ShellResult(finalCode, out.trim(), err.trim().ifBlank { writeError ?: "" })
         } catch (t: Throwable) {
             val cause = (t.cause ?: t)
             ShellResult(-1, "", cause.message ?: cause.javaClass.simpleName)
         }
+    }
+
+    /**
+     * Grava [input] em [path]. O app Temas deixa os arquivos dele só para leitura,
+     * então o arquivo antigo é apagado antes e um novo é criado no lugar.
+     */
+    suspend fun writeFile(path: String, open: () -> InputStream): ShellResult {
+        val r = run("cat > ${q(path)}", open())
+        if (r.ok) return r
+        val again = run("rm -f ${q(path)} && cat > ${q(path)}", open())
+        return if (again.ok) again else again.copy(err = "${again.err} (antes: ${r.err})".trim())
     }
 
     /** Coloca um texto entre aspas simples para o shell (aceita espaços e acentos). */
