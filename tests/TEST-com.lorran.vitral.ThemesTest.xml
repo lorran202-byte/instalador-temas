@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.lorran.vitral.ThemesTest" tests="6" skipped="0" failures="0" errors="0" timestamp="2026-10-24T20:46:53" hostname="runnervmtai0g" time="0.037">
+  <properties/>
+  <testcase name="listCommandQuotesDirs" classname="com.lorran.vitral.ThemesTest" time="0.011"/>
+  <testcase name="parsesStatOutputNewestFirst" classname="com.lorran.vitral.ThemesTest" time="0.008"/>
+  <testcase name="quoteHandlesSpacesAndApostrophes" classname="com.lorran.vitral.ThemesTest" time="0.001"/>
+  <testcase name="inspectReadsDescriptionAndModules" classname="com.lorran.vitral.ThemesTest" time="0.01"/>
+  <testcase name="backupNameRoundTrips" classname="com.lorran.vitral.ThemesTest" time="0.001"/>
+  <testcase name="inspectRejectsZipWithoutDescription" classname="com.lorran.vitral.ThemesTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

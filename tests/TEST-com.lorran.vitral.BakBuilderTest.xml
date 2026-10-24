@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.lorran.vitral.BakBuilderTest" tests="5" skipped="0" failures="0" errors="0" timestamp="2026-10-24T20:46:53" hostname="runnervmtai0g" time="0.301">
+  <properties/>
+  <testcase name="manifestListsSignatures" classname="com.lorran.vitral.BakBuilderTest" time="0.009"/>
+  <testcase name="longPathsUsePrefix" classname="com.lorran.vitral.BakBuilderTest" time="0.079"/>
+  <testcase name="componentCodes" classname="com.lorran.vitral.BakBuilderTest" time="0.0"/>
+  <testcase name="buildsZipWithDescriptAndBak" classname="com.lorran.vitral.BakBuilderTest" time="0.211"/>
+  <testcase name="metadataLooksLikeLocalTheme" classname="com.lorran.vitral.BakBuilderTest" time="0.001"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[]]></system-err>
+</testsuite>

@@ -1,0 +1,10 @@
+package: name='com.lorran.vitral' versionCode='6' versionName='1.5' platformBuildVersionName='16' platformBuildVersionCode='36' compileSdkVersion='36' compileSdkVersionCodename='16'
+uses-permission: name='com.lorran.vitral.DYNAMIC_RECEIVER_NOT_EXPORTED_PERMISSION'
+uses-permission: name='moe.shizuku.manager.permission.API_V23'
+application-label:'Vitral'
+  uses-feature: name='android.hardware.faketouch'
+native-code: 'arm64-v8a' 'armeabi-v7a' 'x86' 'x86_64'
+-rw-r--r-- 1 runner runner 1704540 Oct 24 20:47 app/build/outputs/apk/release/app-release.apk
+V2 Signer: certificate DN: CN=Android Debug, O=Android, C=US
+V2 Signer: certificate SHA-256 digest: 2a281b3e26bb128abaa39aff2e289176d61b2a71fea708b295a139cc145497f7
+V2 Signer: certificate SHA-1 digest: 64db5422fcc9fe9849ce5e392ee67e6be838b448
