@@ -1,0 +1,13 @@
+id,tela,funcao,prioridade,status
+1,inicio,detectar Shizuku e guiar a ativação,must,feito
+2,inicio,pedir permissão do Shizuku,must,feito
+3,tema,escolher .mtz pelo seletor,must,feito
+4,tema,abrir .mtz pelo "Abrir com",should,feito
+5,tema,validar o .mtz e mostrar título/módulos/prévia,must,feito
+6,backup,listar backups do app Temas,must,feito
+7,instalar,cópia de segurança do backup original,must,feito
+8,instalar,gravar o tema novo por cima e conferir,must,feito
+9,instalar,reiniciar o Temas e abrir para aplicar,must,feito
+10,restaurar,devolver a cópia original,should,feito
+11,instalar,aplicar automaticamente sem tocar em Aplicar,could,fora
+12,instalar,impedir que o sistema desfaça o tema,could,todo

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Painel de vidro com uma gota (marca própria do Vitral) -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <!-- placa de vidro -->
+    <path android:fillColor="#40FFFFFF"
+        android:strokeColor="#CCFFFFFF" android:strokeWidth="1.6"
+        android:pathData="M40,30h28a10,10 0,0 1,10 10v28a10,10 0,0 1,-10 10h-28a10,10 0,0 1,-10 -10v-28a10,10 0,0 1,10 -10z" />
+    <!-- brilho -->
+    <path android:fillColor="#33FFFFFF"
+        android:pathData="M40,32h28a8,8 0,0 1,8 8v4c-14,-6 -30,-4 -44,6v-10a8,8 0,0 1,8 -8z" />
+    <!-- gota -->
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M54,40c0,0 -11,12.5 -11,20a11,11 0,0 0,22 0c0,-7.5 -11,-20 -11,-20z" />
+</vector>
