@@ -93,7 +93,7 @@ object BakBuilder {
             }
             entries.filter { it.name.startsWith("preview/") }.forEach { e ->
                 val name = e.name.removePrefix("preview/").substringAfterLast('/')
-                if (name.isNotBlank()) zip.getInputStream(e).use { tar.stream("$root/.data/preview/theme/$themeId/$name", e.size, it) }
+                if (name.isNotBlank()) zip.getInputStream(e).use { tar.stream("$root/.data/preview/theme/$themeId/${previewName(name)}", e.size, it) }
             }
         }
         mtz.inputStream().use { tar.stream("$root/${fileName(title)}", mtz.length(), it) }
@@ -140,18 +140,21 @@ object BakBuilder {
         val subs = children.joinToString(",") {
             """{"localId":${j(it.id)},"resourceCode":${j(it.code)},"extraMeta":{},"metaPath":null,"contentPath":null}"""
         }
-        val thumbs = previews.joinToString(",") { j(it) }
-        return """{"localId":${j(id)},"onlineId":null,"assemblyId":${j(assembly)},"productId":null,""" +
+        val thumbs = previews.joinToString(",") { j(previewName(it)) }
+        // Mesmo formato do "Backup do tema" que o próprio app Temas gera (aplica sem licença):
+        // assemblyId nulo e sem os campos de preço/compra.
+        return """{"localId":${j(id)},"onlineId":null,"assemblyId":null,"productId":null,""" +
             """"hash":${j(hash)},"platform":17,"size":$size,"updatedTime":0,"version":${j(m.version)},""" +
             """"authors":{"fallback":${j(m.author)}},"designers":{"fallback":${j(m.author)}},""" +
             """"titles":{"fallback":${j(m.title)}},"descriptions":{"fallback":${j(m.about)}},""" +
-            """"builtInThumbnails":{"fallback":[$thumbs]},"builtInPreviews":{"fallback":[$thumbs]},""" +
+            """"builtInThumbnails":{"en_US":[$thumbs]},"builtInPreviews":{"en_US":[$thumbs]},""" +
             """"thumbnails":[],"previews":[],"parentResources":[$parents],"subResources":[$subs],""" +
-            """"extraMeta":{},"metaPath":null,"contentPath":null,"rightsPath":null,"screenRatio":null,""" +
-            """"supportHomeSearchBar":false,"packageVersion":null,"packageName":null,"officialIcons":false,""" +
-            """"iconsCount":null,"fontWeight":null,"price":-1,"isBackUpVersion":false,"themeType":0,""" +
-            """"miuiAdapterVersion":null}"""
+            """"extraMeta":{},"metaPath":null,"contentPath":null,"rightsPath":null,"screenRatio":"18:9",""" +
+            """"fontWeight":null,"miuiAdapterVersion":0.0,"wallpaperStyle":0}"""
     }
+
+    /** "preview_lockscreen_0.jpg" -> "en_US_lockscreen_0.jpg", como o app Temas nomeia as prévias. */
+    fun previewName(file: String): String = "en_US_" + file.removePrefix("preview_")
 
     fun descript(h: Host, bakSize: Long, now: Long): String =
         "<?xml version='1.0' encoding='UTF-8' standalone='yes' ?><MIUI-backup><jsonMsg></jsonMsg>" +

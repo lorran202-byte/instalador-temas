@@ -74,7 +74,7 @@ class BakBuilderTest {
             assertTrue(entries.keys.any { it.startsWith("$root/.data/content/icons/") })
             assertTrue(entries.keys.any { it.startsWith("$root/.data/content/lockstyle/") })
             assertTrue(entries.keys.any { it.startsWith("$root/.data/content/wallpaper/") })
-            assertTrue(entries.keys.any { it.startsWith("$root/.data/preview/theme/") && it.endsWith("preview_lockscreen_0.jpg") })
+            assertTrue(entries.keys.any { it.startsWith("$root/.data/preview/theme/") && it.endsWith("en_US_lockscreen_0.jpg") })
             assertEquals(mtz.length().toInt(), entries["$root/Liquid Glass OS.mtz"])
         }
     }
@@ -103,10 +103,11 @@ class BakBuilderTest {
     @Test fun metadataLooksLikeLocalTheme() {
         val json = BakBuilder.metaJson(BakBuilder.Meta("T", "A", "1.0", "D"), "id", "asm", "h", 10, null,
             emptyList(), listOf("preview_lockscreen_0.jpg"))
-        assertTrue(json.contains("\"price\":-1"))
-        assertTrue(json.contains("\"isBackUpVersion\":false"))
+        assertFalse(json.contains("\"price\""))
+        assertFalse(json.contains("isBackUpVersion"))
+        assertTrue(json.contains("\"assemblyId\":null"))
         assertTrue(json.contains("\"rightsPath\":null"))
-        assertTrue(json.contains("\"builtInPreviews\":{\"fallback\":[\"preview_lockscreen_0.jpg\"]}"))
+        assertTrue(json.contains("\"builtInPreviews\":{\"en_US\":[\"en_US_lockscreen_0.jpg\"]}"))
         assertFalse(json.contains("\"resourceCode\":\"theme\""))
     }
 }
