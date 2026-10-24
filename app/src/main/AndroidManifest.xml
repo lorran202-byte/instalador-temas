@@ -5,6 +5,7 @@
     <queries>
         <package android:name="moe.shizuku.privileged.api" />
         <package android:name="com.android.thememanager" />
+        <package android:name="com.miui.backup" />
     </queries>
 
     <application

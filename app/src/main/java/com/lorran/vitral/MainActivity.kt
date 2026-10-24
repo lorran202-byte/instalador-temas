@@ -116,6 +116,33 @@ fun openThemes(context: Context) {
     }
 }
 
+fun openBackupApp(context: Context) {
+    val i = context.packageManager.getLaunchIntentForPackage("com.miui.backup")
+        ?: Intent(android.provider.Settings.ACTION_DEVICE_INFO_SETTINGS)
+    try { context.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {
+        try { context.startActivity(Intent(android.provider.Settings.ACTION_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
+    }
+}
+
+@Composable
+fun BackupModeCard(s: UiState, vm: MainViewModel) {
+    GlassCard {
+        CardTitle(Icons.Rounded.Inventory2, "2. Gerar backup do tema")
+        Hint(
+            "Transforma o .mtz num backup do app Temas. Depois é só restaurar em Configurações > " +
+                "Sobre o telefone > Fazer backup e restaurar > Restaurar. Não precisa do Shizuku."
+        )
+        Button(
+            onClick = vm::buildBackup, enabled = s.picked != null && !s.busy,
+            modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(28.dp),
+        ) {
+            if (s.busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = Color.White)
+            else { Icon(Icons.Rounded.Inventory2, null); Spacer(Modifier.width(8.dp)); Text("Gerar backup", fontSize = 17.sp) }
+        }
+        if (s.picked == null) Hint("Escolha um arquivo .mtz primeiro.")
+    }
+}
+
 fun openUrl(context: Context, url: String) {
     try { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) } catch (_: Exception) {}
 }
@@ -137,13 +164,17 @@ fun App(vm: MainViewModel) {
             Text("Vitral", fontSize = 34.sp, fontWeight = FontWeight.Bold, color = Color.White)
             Text("Instale temas .mtz no HyperOS sem root", color = Texto2, fontSize = 15.sp)
 
-            ShizukuCard(s, ctx)
+            ThemeCard(s, onPick = { picker.launch(arrayOf("*/*")) })
+            BackupModeCard(s, vm)
+            if (s.steps.isNotEmpty()) StepsCard(s)
 
+            Text("Instalação direta (Shizuku)", color = Color.White, fontWeight = FontWeight.SemiBold,
+                fontSize = 20.sp, modifier = Modifier.padding(top = 10.dp))
+            Hint("Outro jeito: troca um tema que já está no app Temas pelo novo. Precisa do Shizuku.")
+            ShizukuCard(s, ctx)
             if (s.shizuku == ShizukuState.PRONTO) {
-                ThemeCard(s, onPick = { picker.launch(arrayOf("*/*")) })
                 TargetCard(s, vm, ctx)
                 InstallButton(s, vm)
-                if (s.steps.isNotEmpty()) StepsCard(s)
                 if (s.backups.isNotEmpty()) RestoreCard(s, vm)
             }
             Spacer(Modifier.height(24.dp))
@@ -156,7 +187,8 @@ fun App(vm: MainViewModel) {
                 title = { Text(o.title) },
                 text = { Text(o.message) },
                 confirmButton = {
-                    if (o.ok) TextButton(onClick = { vm.dismissOutcome(); openThemes(ctx) }) { Text("Abrir Temas") }
+                    if (o.ok && o.openBackup) TextButton(onClick = { vm.dismissOutcome(); openBackupApp(ctx) }) { Text("Abrir Backup") }
+                    else if (o.ok) TextButton(onClick = { vm.dismissOutcome(); openThemes(ctx) }) { Text("Abrir Temas") }
                     else TextButton(onClick = vm::dismissOutcome) { Text("Entendi") }
                 },
                 dismissButton = { if (o.ok) TextButton(onClick = vm::dismissOutcome) { Text("Fechar") } },
@@ -262,7 +294,7 @@ fun ThemeCard(s: UiState, onPick: () -> Unit) {
 @Composable
 fun TargetCard(s: UiState, vm: MainViewModel, ctx: Context) {
     GlassCard {
-        CardTitle(Icons.Rounded.SwapHoriz, "2. Backup que vai ser trocado")
+        CardTitle(Icons.Rounded.SwapHoriz, "Tema que vai ser trocado")
         when {
             s.loading && s.targets.isEmpty() -> LinearProgressIndicator(Modifier.fillMaxWidth())
             s.targets.isEmpty() -> {
