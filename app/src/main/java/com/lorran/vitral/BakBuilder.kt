@@ -80,13 +80,15 @@ object BakBuilder {
                 Part(e, code, uuid("$themeId:$code:$hash"), e.size, hash)
             }.distinctBy { it.code }
 
+            val previews = entries.map { it.name }.filter { it.startsWith("preview/") }
+                .map { it.substringAfterLast('/') }.filter { it.isNotBlank() }
             val meta = Meta(title, author, version, about)
             tar.file("$root/.data/meta/theme/$themeId.mrm",
-                metaJson(meta, themeId, assembly, "theme", themeHash, mtz.length(), null, parts).toByteArray())
+                metaJson(meta, themeId, assembly, themeHash, mtz.length(), null, parts, previews).toByteArray())
             tar.file("$root/.data/content/theme/$themeId.mrc", ByteArray(0))
             for (p in parts) {
                 tar.file("$root/.data/meta/${p.code}/${p.id}.mrm",
-                    metaJson(meta, p.id, assembly, p.code, p.hash, p.size, themeId, emptyList()).toByteArray())
+                    metaJson(meta, p.id, assembly, p.hash, p.size, themeId, emptyList(), emptyList()).toByteArray())
                 zip.getInputStream(p.entry).use { tar.stream("$root/.data/content/${p.code}/${p.id}.mrc", p.size, it) }
             }
             entries.filter { it.name.startsWith("preview/") }.forEach { e ->
@@ -99,8 +101,8 @@ object BakBuilder {
         return title
     }
 
-    private data class Part(val entry: ZipEntry, val code: String, val id: String, val size: Long, val hash: String)
-    private data class Meta(val title: String, val author: String, val version: String, val about: String)
+    data class Part(val entry: ZipEntry, val code: String, val id: String, val size: Long, val hash: String)
+    data class Meta(val title: String, val author: String, val version: String, val about: String)
 
     /** Código de recurso que o app Temas usa para cada módulo do .mtz. */
     fun componentCode(name: String): String? {
@@ -126,17 +128,29 @@ object BakBuilder {
         h.signatures.forEach { append(it).append('\n') }
     }.toByteArray()
 
-    private fun metaJson(m: Meta, id: String, assembly: String, code: String, hash: String, size: Long,
-                         parent: String?, children: List<Part>): String {
-        val parents = if (parent == null) "" else """{"localId":${j(parent)},"resourceCode":"theme","extraMeta":{}}"""
-        val subs = children.joinToString(",") { """{"localId":${j(it.id)},"resourceCode":${j(it.code)},"extraMeta":{}}""" }
+    /**
+     * Registro do tema no mesmo formato dos temas locais que o app Temas já aceita
+     * (price -1 = tema local/grátis, isBackUpVersion false). Com price 0 e
+     * isBackUpVersion true o app tentava baixar a licença e falhava (downloadRight|413).
+     */
+    fun metaJson(m: Meta, id: String, assembly: String, hash: String, size: Long,
+                 parent: String?, children: List<Part>, previews: List<String>): String {
+        val parents = if (parent == null) "" else
+            """{"localId":${j(parent)},"resourceCode":"theme","extraMeta":{},"metaPath":null,"contentPath":null}"""
+        val subs = children.joinToString(",") {
+            """{"localId":${j(it.id)},"resourceCode":${j(it.code)},"extraMeta":{},"metaPath":null,"contentPath":null}"""
+        }
+        val thumbs = previews.joinToString(",") { j(it) }
         return """{"localId":${j(id)},"onlineId":null,"assemblyId":${j(assembly)},"productId":null,""" +
             """"hash":${j(hash)},"platform":17,"size":$size,"updatedTime":0,"version":${j(m.version)},""" +
             """"authors":{"fallback":${j(m.author)}},"designers":{"fallback":${j(m.author)}},""" +
             """"titles":{"fallback":${j(m.title)}},"descriptions":{"fallback":${j(m.about)}},""" +
-            """"builtInThumbnails":{"fallback":[]},"builtInPreviews":{"fallback":[]},"thumbnails":[],"previews":[],""" +
-            """"parentResources":[$parents],"subResources":[$subs],"extraMeta":{},"resourceCode":${j(code)},""" +
-            """"price":0,"isBackUpVersion":true,"themeType":0,"miuiAdapterVersion":"3.3"}"""
+            """"builtInThumbnails":{"fallback":[$thumbs]},"builtInPreviews":{"fallback":[$thumbs]},""" +
+            """"thumbnails":[],"previews":[],"parentResources":[$parents],"subResources":[$subs],""" +
+            """"extraMeta":{},"metaPath":null,"contentPath":null,"rightsPath":null,"screenRatio":null,""" +
+            """"supportHomeSearchBar":false,"packageVersion":null,"packageName":null,"officialIcons":false,""" +
+            """"iconsCount":null,"fontWeight":null,"price":-1,"isBackUpVersion":false,"themeType":0,""" +
+            """"miuiAdapterVersion":null}"""
     }
 
     fun descript(h: Host, bakSize: Long, now: Long): String =

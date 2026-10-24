@@ -99,4 +99,14 @@ class BakBuilderTest {
         val bytes = "MIUI BACKUP\nnone\n".toByteArray() + bo.toByteArray()
         assertEquals(setOf(long), tarEntries(bytes).keys)
     }
+
+    @Test fun metadataLooksLikeLocalTheme() {
+        val json = BakBuilder.metaJson(BakBuilder.Meta("T", "A", "1.0", "D"), "id", "asm", "h", 10, null,
+            emptyList(), listOf("preview_lockscreen_0.jpg"))
+        assertTrue(json.contains("\"price\":-1"))
+        assertTrue(json.contains("\"isBackUpVersion\":false"))
+        assertTrue(json.contains("\"rightsPath\":null"))
+        assertTrue(json.contains("\"builtInPreviews\":{\"fallback\":[\"preview_lockscreen_0.jpg\"]}"))
+        assertFalse(json.contains("\"resourceCode\":\"theme\""))
+    }
 }
