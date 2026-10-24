@@ -9,6 +9,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import android.provider.OpenableColumns
+import android.text.format.DateUtils
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.AndroidViewModel
@@ -41,6 +42,9 @@ data class UiState(
     val steps: List<String> = emptyList(),
     val outcome: Outcome? = null,
     val listError: String? = null,
+    val slots: List<Slot> = emptyList(),
+    val slotSel: String? = null,
+    val saved: Set<String> = emptySet(),
 )
 
 class MainViewModel(app: Application) : AndroidViewModel(app) {
@@ -56,6 +60,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         _ui.update { it.copy(loading = true, uid = Shell.uid(), listError = null) }
         val list = Shell.run(Themes.listCommand(Themes.THEME_DIRS))
         val backups = Shell.run(Themes.listCommand(listOf(Themes.BACKUP_DIR), 1))
+        val dump = Shell.run(Slots.dumpCommand)
+        val saved = Shell.run("ls -1 ${Shell.q(Slots.ORIGINALS)} 2>/dev/null").out.lines().map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        val slots = Slots.splitDump(dump.out).mapNotNull { (n, t, j) -> Slots.parse(n, t, j) }
+            .filter { it.local && it.parts.keys.any { c -> c in SWAP_CODES } }
+            .sortedByDescending { it.modified }
         val targets = Themes.parseList(list.out)
         _ui.update { s ->
             s.copy(
@@ -63,9 +72,104 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 targets = targets,
                 selected = s.selected?.takeIf { sel -> targets.any { it.path == sel } } ?: targets.firstOrNull()?.path,
                 backups = Themes.parseList(backups.out),
-                listError = if (list.code == -1) list.err else null,
+                listError = if (dump.code == -1) dump.err else null,
+                slots = slots,
+                slotSel = s.slotSel?.takeIf { id -> slots.any { it.id == id } } ?: slots.firstOrNull()?.id,
+                saved = saved,
             )
         }
+    }
+
+    fun selectSlot(id: String) = _ui.update { it.copy(slotSel = id) }
+
+    /** Coloca os componentes do tema novo dentro de um "Backup do tema". */
+    fun swapIntoSlot() = viewModelScope.launch {
+        val s = _ui.value
+        val slot = s.slots.firstOrNull { it.id == s.slotSel } ?: return@launch
+        if (s.picked == null || !stage.exists()) return@launch
+        _ui.update { it.copy(busy = true, steps = listOf("Separando as partes do tema novo…"), outcome = null) }
+        val app = getApplication<Application>()
+        val parts = withContext(Dispatchers.IO) {
+            runCatching {
+                val dir = File(app.cacheDir, "partes").apply { deleteRecursively(); mkdirs() }
+                java.util.zip.ZipFile(stage).use { zip ->
+                    zip.entries().asSequence().filter { !it.isDirectory }.mapNotNull { e ->
+                        val code = BakBuilder.componentCode(e.name) ?: return@mapNotNull null
+                        if (code !in SWAP_CODES) return@mapNotNull null
+                        val f = File(dir, code)
+                        zip.getInputStream(e).use { i -> f.outputStream().use { i.copyTo(it) } }
+                        code to f
+                    }.toMap()
+                }
+            }
+        }.getOrElse { e -> return@launch fail("Não consegui ler o tema.", ShellResult(-1, "", e.message ?: "")) }
+
+        val q = Shell::q
+        val keep = "${Slots.ORIGINALS}/${slot.id}"
+        val done = mutableListOf<String>()
+        val firstTime = slot.id !in s.saved
+        for ((code, file) in parts) {
+            val subId = slot.parts[code] ?: continue
+            val content = "${Slots.DATA}/content/$code/$subId.mrc"
+            val meta = "${Slots.DATA}/meta/$code/$subId.mrm"
+            step("Trocando: ${label(code)}…")
+            if (firstTime) {
+                val r = Shell.run("mkdir -p ${q("$keep/content/$code")} ${q("$keep/meta/$code")} && " +
+                    "cp ${q(content)} ${q("$keep/content/$code/")} && cp ${q(meta)} ${q("$keep/meta/$code/")}")
+                if (!r.ok) return@launch fail("Não consegui guardar a cópia original de ${label(code)}.", r)
+            }
+            val w = Shell.run("cat > ${q(content)}", file.inputStream())
+            if (!w.ok) return@launch fail("Não consegui gravar ${label(code)}.", w)
+            val old = Shell.run("cat ${q(meta)}")
+            if (old.ok && old.out.isNotBlank()) {
+                val patched = Slots.patchMeta(old.out, sha1(file), file.length())
+                Shell.run("cat > ${q(meta)}", patched.byteInputStream())
+            }
+            done += label(code)
+        }
+        if (done.isEmpty()) {
+            _ui.update { it.copy(busy = false, outcome = Outcome(false, "Nada para trocar",
+                "Esse backup não tem ícones, tela de bloqueio nem papel de parede para trocar. Escolha outro.")) }
+            return@launch
+        }
+        step("Reiniciando o app Temas…")
+        Shell.run("am force-stop ${Themes.THEMES_PKG}")
+        _ui.update {
+            it.copy(busy = false, outcome = Outcome(true, "Tema colocado no backup",
+                "Trocado: ${done.joinToString(", ")}.\n\nAbra o app Temas, entre no \"${slot.title}\" de " +
+                    "${DateUtils.formatDateTime(app, slot.modified, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME)} " +
+                    "e toque em Aplicar. Para voltar ao original, use \"Desfazer\" no Vitral."))
+        }
+        refresh()
+    }
+
+    /** Devolve o conteúdo original guardado do "Backup do tema". */
+    fun undoSlot(slotId: String) = viewModelScope.launch {
+        val q = Shell::q
+        _ui.update { it.copy(busy = true, steps = listOf("Devolvendo o conteúdo original…"), outcome = null) }
+        val keep = "${Slots.ORIGINALS}/$slotId"
+        val r = Shell.run("cp -R ${q("$keep/.")} ${q(Slots.DATA + "/")} && rm -rf ${q(keep)} && am force-stop ${Themes.THEMES_PKG}")
+        if (!r.ok) return@launch fail("Não consegui desfazer.", r)
+        _ui.update { it.copy(busy = false, outcome = Outcome(true, "Desfeito",
+            "O backup voltou ao conteúdo original. Aplique ele no app Temas se quiser voltar ao tema antigo.")) }
+        refresh()
+    }
+
+    private fun label(code: String) = when (code) {
+        "icons" -> "ícones"; "lockstyle" -> "tela de bloqueio"
+        "wallpaper" -> "papel de parede"; "lockscreen" -> "papel de parede da tela de bloqueio"
+        else -> code
+    }
+
+    private fun sha1(f: File): String {
+        val d = java.security.MessageDigest.getInstance("SHA-1")
+        f.inputStream().use { s -> val b = ByteArray(64 * 1024); while (true) { val n = s.read(b); if (n < 0) break; d.update(b, 0, n) } }
+        return d.digest().joinToString("") { "%02x".format(it) }
+    }
+
+    companion object {
+        /** Partes que o Vitral troca dentro de um backup. */
+        val SWAP_CODES = setOf("icons", "lockstyle", "wallpaper", "lockscreen")
     }
 
     fun select(path: String) = _ui.update { it.copy(selected = path) }

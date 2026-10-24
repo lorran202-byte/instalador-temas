@@ -125,6 +125,73 @@ fun openBackupApp(context: Context) {
 }
 
 @Composable
+fun SlotCard(s: UiState, vm: MainViewModel, ctx: Context) {
+    var undo by remember { mutableStateOf<Slot?>(null) }
+    GlassCard {
+        CardTitle(Icons.Rounded.SwapHoriz, "2. Escolha um \"Backup do tema\"")
+        when {
+            s.loading && s.slots.isEmpty() -> LinearProgressIndicator(Modifier.fillMaxWidth())
+            s.slots.isEmpty() -> {
+                Hint(
+                    "Não achei nenhum \"Backup do tema\". No app Temas, crie um backup do tema atual " +
+                        "(ele aparece na lista como \"Backup do tema\") e volte aqui."
+                )
+                s.listError?.let { Text("Erro: $it", color = Alerta, fontSize = 13.sp) }
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Button(onClick = { openThemes(ctx) }) { Text("Abrir Temas") }
+                    OutlinedButton(onClick = { vm.refresh() }) { Text("Procurar de novo") }
+                }
+            }
+            else -> {
+                Hint(
+                    "O Vitral coloca os ícones, a tela de bloqueio e os papéis de parede do tema novo " +
+                        "dentro do backup escolhido. Ele guarda uma cópia do original para desfazer."
+                )
+                s.slots.forEach { slot ->
+                    val sel = slot.id == s.slotSel
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp))
+                            .background(if (sel) Color(0x337C9CFF) else Color.Transparent)
+                            .clickable(enabled = !s.busy) { vm.selectSlot(slot.id) }
+                            .padding(horizontal = 8.dp, vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = sel, onClick = { vm.selectSlot(slot.id) }, enabled = !s.busy)
+                        Column(Modifier.weight(1f)) {
+                            Text(slot.title, color = Color.White, fontSize = 15.sp)
+                            Text(
+                                DateUtils.formatDateTime(ctx, slot.modified, DateUtils.FORMAT_SHOW_DATE or DateUtils.FORMAT_SHOW_TIME) +
+                                    (if (slot.id in s.saved) " · já tem o tema novo" else ""),
+                                color = Texto2, fontSize = 12.sp,
+                            )
+                        }
+                        if (slot.id in s.saved) TextButton(onClick = { undo = slot }, enabled = !s.busy) { Text("Desfazer") }
+                    }
+                }
+                Button(
+                    onClick = vm::swapIntoSlot, enabled = s.picked != null && s.slotSel != null && !s.busy,
+                    modifier = Modifier.fillMaxWidth().height(56.dp), shape = RoundedCornerShape(28.dp),
+                ) {
+                    if (s.busy) CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp, color = Color.White)
+                    else { Icon(Icons.Rounded.AutoAwesome, null); Spacer(Modifier.width(8.dp)); Text("Colocar o tema neste backup", fontSize = 16.sp) }
+                }
+                if (s.picked == null) Hint("Escolha o arquivo .mtz primeiro.")
+                TextButton(onClick = { vm.refresh() }) { Text("Atualizar lista") }
+            }
+        }
+    }
+    undo?.let { slot ->
+        AlertDialog(
+            onDismissRequest = { undo = null },
+            title = { Text("Desfazer?") },
+            text = { Text("O \"${slot.title}\" volta a ter o conteúdo original.") },
+            confirmButton = { TextButton(onClick = { undo = null; vm.undoSlot(slot.id) }) { Text("Desfazer") } },
+            dismissButton = { TextButton(onClick = { undo = null }) { Text("Cancelar") } },
+        )
+    }
+}
+
+@Composable
 fun BackupModeCard(s: UiState, vm: MainViewModel) {
     GlassCard {
         CardTitle(Icons.Rounded.Inventory2, "2. Gerar backup do tema")
@@ -165,18 +232,9 @@ fun App(vm: MainViewModel) {
             Text("Instale temas .mtz no HyperOS sem root", color = Texto2, fontSize = 15.sp)
 
             ThemeCard(s, onPick = { picker.launch(arrayOf("*/*")) })
-            BackupModeCard(s, vm)
-            if (s.steps.isNotEmpty()) StepsCard(s)
-
-            Text("Instalação direta (Shizuku)", color = Color.White, fontWeight = FontWeight.SemiBold,
-                fontSize = 20.sp, modifier = Modifier.padding(top = 10.dp))
-            Hint("Outro jeito: troca um tema que já está no app Temas pelo novo. Precisa do Shizuku.")
             ShizukuCard(s, ctx)
-            if (s.shizuku == ShizukuState.PRONTO) {
-                TargetCard(s, vm, ctx)
-                InstallButton(s, vm)
-                if (s.backups.isNotEmpty()) RestoreCard(s, vm)
-            }
+            if (s.shizuku == ShizukuState.PRONTO) SlotCard(s, vm, ctx)
+            if (s.steps.isNotEmpty()) StepsCard(s)
             Spacer(Modifier.height(24.dp))
         }
 
